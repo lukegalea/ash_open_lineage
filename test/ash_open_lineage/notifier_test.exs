@@ -45,10 +45,9 @@ defmodule AshOpenLineage.NotifierTest do
     assert producer_facet["producer_name"] == "catalog.thing.create"
     assert producer_facet["_producer"] == @producer
 
-    # default correlation provider: derived runId (one per correlation+job),
-    # depth 0, no parent facet
+    # derived runId: sha256-based, well-formed UUID shape (no version nibble)
     assert event["run"]["runId"] =~
-             ~r/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
+           ~r/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 
     refute Map.has_key?(event["run"]["facets"], "parent")
   end
