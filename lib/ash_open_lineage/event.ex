@@ -209,6 +209,11 @@ defmodule AshOpenLineage.Event do
     end
   end
 
+  # Host-side descriptors arrive string-keyed (JSON-adjacent); accept both.
+  defp dataset(%{"name" => name} = descriptor, opts) do
+    dataset(%{name: name, namespace: descriptor["namespace"], facets: descriptor["facets"]}, opts)
+  end
+
   defp stringify_keys(facets) do
     Map.new(facets, fn {key, value} -> {to_string(key), value} end)
   end
