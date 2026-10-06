@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/lukegalea/ash_open_lineage/blob/main/priv/openlineage/facets/ash_open_lineage_producer_facet.json",
+  "title": "ashOpenLineageProducer (run facet)",
+  "description": "Custom run facet emitted by ash_open_lineage naming the Ash job that produced the event: namespace, resource, action and table names. Structural names only - never actor identities, tenant ids, or filter/argument values.",
+  "type": "object",
+  "properties": {
+    "_producer": {
+      "description": "URI identifying the producer of this metadata.",
+      "type": "string",
+      "format": "uri"
+    },
+    "_schemaURL": {
+      "description": "URL of this schema definition.",
+      "type": "string",
+      "format": "uri"
+    },
+    "producer_name": {
+      "description": "Dot-joined structural names of the producing job, e.g. \"calendar.calendar_event.create\". Deliberately contains no actor, tenant, or data values.",
+      "type": "string"
+    }
+  },
+  "required": ["_producer", "_schemaURL", "producer_name"],
+  "additionalProperties": false
+}
