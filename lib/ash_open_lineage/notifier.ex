@@ -21,7 +21,11 @@ defmodule AshOpenLineage.Notifier do
 
   ## runId and depth
 
-  The run id is the correlation provider's `id/0`; a depth above zero marks the
+  The run id is derived deterministically from the correlation id *and the
+  job* — one stable run per (correlation, job) pair. Reusing the bare
+  correlation id across several jobs collapses distinct jobs into one consumer
+  run; the derivation keeps runs distinct while staying derivable from the
+  audit log's correlation id. A depth above zero marks the
   action as nested under an outer operation and adds the `parent` run facet,
   with the parent's id read from the optional `:parent_id_provider` application
   env (a module exporting `parent_id/0`). With no provider configured the parent
@@ -93,11 +97,30 @@ defmodule AshOpenLineage.Notifier do
       job_name: job_name,
       inputs: inputs,
       outputs: outputs,
-      run_id: correlation.id(),
+      run_id: run_id(correlation.id(), namespace, job_name),
       parent_run_id: parent_run_id(correlation.depth()),
       producer: AshOpenLineage.Info.lineage_producer!(resource),
       producer_name: "#{namespace}.#{job_name}"
     ]
+  end
+
+  # One OpenLineage run per (correlation, job) pair, NOT per correlation.
+  # A correlation id routinely spans several different jobs — one user action
+  # writing several tables — and reusing one runId across jobs makes every
+  # consumer (Marquez included) collapse them into a single run whose job
+  # association flips per event: the runs simply vanish. Deriving a stable,
+  # deterministic UUID per (correlation, namespace, job) keeps the audit-log
+  # join ("lineage for this audit entry") a bounded lookup — all runs of one
+  # correlation share a prefix-derivable id space — while each job keeps its
+  # own run. Multiple invocations of the SAME job inside one correlation share
+  # that run deliberately: a run is a job execution, and re-emission updates it.
+  defp run_id(correlation_id, namespace, job_name) do
+    <<a::binary-size(8), b::binary-size(4), c::binary-size(4), d::binary-size(4),
+      e::binary-size(12), _::binary>> =
+      :crypto.hash(:sha256, correlation_id <> "/" <> namespace <> "/" <> job_name)
+      |> Base.encode16(case: :lower)
+
+    "#{a}-#{b}-#{c}-#{d}-#{e}"
   end
 
   defp parent_run_id(0), do: nil

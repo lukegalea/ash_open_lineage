@@ -45,7 +45,8 @@ defmodule AshOpenLineage.NotifierTest do
     assert producer_facet["producer_name"] == "catalog.thing.create"
     assert producer_facet["_producer"] == @producer
 
-    # default correlation provider: fresh uuid runId, depth 0, no parent facet
+    # default correlation provider: derived runId (one per correlation+job),
+    # depth 0, no parent facet
     assert event["run"]["runId"] =~
              ~r/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
 
@@ -97,7 +98,7 @@ defmodule AshOpenLineage.NotifierTest do
     Ash.create!(Ash.Changeset.for_create(Thing, :create, %{name: "widget"}))
 
     assert [event] = InMemory.events()
-    assert event["run"]["runId"] == Correlation.id()
+    assert event["run"]["runId"] == derived_run_id(Correlation.id(), "catalog", "thing.create")
     assert event["run"]["facets"]["parent"]["run"]["runId"] == ParentId.parent_id()
   end
 
@@ -107,7 +108,7 @@ defmodule AshOpenLineage.NotifierTest do
     Ash.create!(Ash.Changeset.for_create(Thing, :create, %{name: "widget"}))
 
     assert [event] = InMemory.events()
-    assert event["run"]["runId"] == Correlation.id()
+    assert event["run"]["runId"] == derived_run_id(Correlation.id(), "catalog", "thing.create")
     refute Map.has_key?(event["run"]["facets"], "parent")
   end
 
@@ -125,5 +126,15 @@ defmodule AshOpenLineage.NotifierTest do
            }
 
     assert AshOpenLineage.Info.resource_dataset(Thing) == nil
+  end
+
+  # Mirrors the notifier's derivation: one stable run per (correlation, job).
+  defp derived_run_id(correlation_id, namespace, job_name) do
+    <<a::binary-size(8), b::binary-size(4), c::binary-size(4), d::binary-size(4),
+      e::binary-size(12), _::binary>> =
+      :crypto.hash(:sha256, correlation_id <> "/" <> namespace <> "/" <> job_name)
+      |> Base.encode16(case: :lower)
+
+    "#{a}-#{b}-#{c}-#{d}-#{e}"
   end
 end
