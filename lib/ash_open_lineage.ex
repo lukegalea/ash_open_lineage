@@ -179,6 +179,8 @@ defmodule AshOpenLineage do
       run_id: Keyword.get(opts, :run_id),
       parent_run_id: Keyword.get(opts, :parent_run_id),
       root: Keyword.get(opts, :root),
+      correlation_id: Keyword.get(opts, :correlation_id),
+      correlation_depth: Keyword.get(opts, :correlation_depth),
       event_time: Keyword.get(opts, :event_time)
     ]
     # An unset option must be *absent*, not present-with-nil: the event builder

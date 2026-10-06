@@ -167,15 +167,22 @@ defmodule AshOpenLineage.Event do
     %{"job" => %{"namespace" => ns, "name" => name}, "run" => %{"runId" => run_id}}
   end
 
-  # Structural names only. This facet is the leak boundary: if it ever grows a
-  # field derived from actor, tenant, or argument values, the leak test must be
-  # the thing that catches it.
+  # Structural names only — plus the correlation id and depth, which are the
+  # host's own correlation metadata (an opaque id, never a value, actor or
+  # tenant). The runId is *derived* from the correlation id, so this facet is
+  # what makes "lineage run for this audit entry" a direct lookup again after
+  # runIds became per-(correlation, job): the audit log's
+  # metadata["correlation_id"] matches the facet's correlationId exactly.
+  # If this facet ever grows a field derived from actor, tenant, or argument
+  # values, the leak test must be the thing that catches it.
   defp producer_facet(opts, producer) do
     %{
       "_producer" => producer,
       "_schemaURL" => @producer_facet_schema_url,
       "producer_name" => Keyword.fetch!(opts, :producer_name)
     }
+    |> maybe_put("correlationId", opts[:correlation_id])
+    |> maybe_put("depth", opts[:correlation_depth])
   end
 
   defp error_facet(opts, producer) do

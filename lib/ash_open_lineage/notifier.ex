@@ -99,6 +99,8 @@ defmodule AshOpenLineage.Notifier do
       outputs: outputs,
       run_id: run_id(correlation.id(), namespace, job_name),
       parent_run_id: parent_run_id(correlation.depth()),
+      correlation_id: correlation.id(),
+      correlation_depth: correlation.depth(),
       producer: AshOpenLineage.Info.lineage_producer!(resource),
       producer_name: "#{namespace}.#{job_name}"
     ]
