@@ -80,6 +80,12 @@ defmodule AshOpenLineage do
     * `:root` — `%{namespace: _, name: _, run_id: _}` for the parent facet's
       v1.52 `root` sub-object.
     * `:producer` — producer URI override.
+    * `:producer_name` — the `ashOpenLineageProducer` facet's `producer_name`;
+      defaults to `"{namespace}.{name}"`.
+    * `:correlation_id` — puts `correlationId` in the `ashOpenLineageProducer`
+      facet. Not read from the correlation provider: absent unless passed.
+    * `:correlation_depth` — puts `depth` in that facet. Also absent unless
+      passed.
     * `:event_time` — `%DateTime{}` or ISO8601 binary (tests; defaults to now).
 
   Returns the transport's result: `:ok` or `{:error, term()}`.
@@ -109,7 +115,8 @@ defmodule AshOpenLineage do
 
   `reason` may be a binary, an exception, or any term (inspected). The message
   lands in the `error` run facet's `errorMessage`. Accepts the same `:run_id`,
-  `:parent_run_id`, `:root`, `:producer` and `:event_time` options as `emit/2` —
+  `:parent_run_id`, `:root`, `:producer`, `:producer_name`, `:correlation_id`,
+  `:correlation_depth` and `:event_time` options as `emit/2` —
   pass the `run_id` the START used so the failure attaches to the same run.
 
   Returns the transport's result: `:ok` or `{:error, term()}`.

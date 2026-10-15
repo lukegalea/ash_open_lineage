@@ -19,8 +19,9 @@ next to the README when feeding an agent or LLM.
   (`sha256(correlation/namespace/job)`, formatted UUID-shaped: one run per
   correlation and job), and carries the correlation id itself in the
   `ashOpenLineageProducer` facet as `correlationId`, alongside `depth`. That
-  facet field is what joins the graph to the audit trail. Without a provider
-  you get throwaway UUIDs per event.
+  facet field joins the graph to the audit trail only when the provider
+  returns a stable id for the whole operation (per request). Without one the
+  default mints a fresh UUID per call: throwaway ids that join nothing.
 - **Configure the transport before first use.**
   Resources: per-resource `transport` in the `lineage` section.
   `emit/2`/`fail/3`: `config :ash_open_lineage, transport: ...` (default
@@ -41,8 +42,8 @@ next to the README when feeding an agent or LLM.
   after. A missing node is a lie of omission; pass the same `run_id` so the
   three events form one run. An explicit `run_id` is used verbatim; without
   one, `emit/2`/`fail/3` take the correlation provider's `id/0` as is (no
-  per-job derivation, and no `correlationId` in the facet unless passed as
-  `:correlation_id`).
+  per-job derivation, and no `correlationId` or `depth` in the facet unless
+  passed as `:correlation_id` / `:correlation_depth`).
 
 ## NEVER
 

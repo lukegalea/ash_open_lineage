@@ -107,7 +107,7 @@ disappears from the graph while still costing money.
         "_producer": "...", "_schemaURL": "...",
         "producer_name": "support.ticket.create",
         "correlationId": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
-        "depth": 0
+        "depth": 1
       }
     }
   }
@@ -124,10 +124,15 @@ disappears from the graph while still costing money.
   `sha256("{correlation}/{namespace}/{job}")` formatted UUID-shaped — so each
   job gets its own run within one correlation, and repeat invocations of the
   same job in that correlation share it. The correlation id itself travels in
-  the `ashOpenLineageProducer` facet as `correlationId` (with `depth`); that
-  field is what joins the audit trail, the logs and the lineage graph. Depth
-  above zero adds the `parent` facet; the parent's id comes from
-  `:parent_id_provider` or the facet is omitted.
+  the `ashOpenLineageProducer` facet as `correlationId` (with `depth`). That
+  field joins a lineage event to the host's audit trail (and to its logs, if
+  the host logs the same id) only when the configured provider returns a
+  stable id for the whole operation, as a per-request provider does. The
+  default provider mints a fresh UUID on every call, so its `correlationId`
+  matches nothing else, not even the id the `runId` was derived from. The
+  `parent` facet appears only when depth is above zero *and*
+  `:parent_id_provider` returns an id (the example above shows depth 1 with a
+  provider configured); otherwise it is omitted.
 * START/FAIL for resource actions are deliberately out of scope (ADR 0012): a
   notifier can only state what already happened. The host emits its own START
   via `AshOpenLineage.emit/2` before a call when it wants one.

@@ -17,7 +17,7 @@ defmodule AshOpenLineage.MixProject do
       elixirc_paths: elixirc_paths(Mix.env()),
       description: """
       Emits OpenLineage spec 2-0-2 RunEvents from Ash: a Spark extension +
-      Ash.Notifier that emits a COMPLETE event for each successful resource action,
+      Ash.Notifier that emits a COMPLETE event for each successful create, update or destroy,
       and a small public API for non-Ash jobs. Facets carry structural names only — never actor, tenant or
       data values.
       """,
