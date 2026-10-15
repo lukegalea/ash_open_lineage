@@ -16,9 +16,9 @@ defmodule AshOpenLineage.MixProject do
       start_permanent: Mix.env() == :prod,
       elixirc_paths: elixirc_paths(Mix.env()),
       description: """
-      The first Elixir OpenLineage emitter. A Spark extension + Ash.Notifier that
-      emits spec 2-0-2 RunEvents for resource actions, and a small public API for
-      non-Ash jobs. Facets carry structural names only — never actor, tenant or
+      Emits OpenLineage spec 2-0-2 RunEvents from Ash: a Spark extension +
+      Ash.Notifier that emits a COMPLETE event for each successful resource action,
+      and a small public API for non-Ash jobs. Facets carry structural names only — never actor, tenant or
       data values.
       """,
       source_url: @source_url,

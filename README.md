@@ -3,14 +3,13 @@
 <!-- SPDX-FileCopyrightText: 2026 Luke Galea -->
 <!-- SPDX-License-Identifier: MIT -->
 
-The **first Elixir OpenLineage emitter**: a Spark extension + `Ash.Notifier` that
+An Elixir OpenLineage emitter: a Spark extension + `Ash.Notifier` that
 gives every Ash resource OpenLineage provenance, plus a small API for jobs that
 never touch a resource.
 
 Spec **2-0-2** RunEvents, emitted to Marquez / DataHub / Atlan / anything that
 speaks the OpenLineage HTTP contract. Contracted by ADR 0012
-(`../ash_enterprise/docs/adr/0012-openlineage-and-marquez.md`) after finding
-zero on hex.
+(`../ash_enterprise/docs/adr/0012-openlineage-and-marquez.md`).
 
 ## The leak rule
 
@@ -55,7 +54,7 @@ Configure the host seams:
 
 ```elixir
 config :ash_open_lineage,
-  # run ids come from here (see AshOpenLineage.CorrelationProvider)
+  # run ids are derived from this (see AshOpenLineage.CorrelationProvider)
   correlation_provider: AshEnterprise.Platform.Correlation,
   # optional: module exporting parent_id/0, for the parent run facet
   parent_id_provider: MyApp.ParentRunId,
@@ -101,12 +100,14 @@ disappears from the graph while still costing money.
   "outputs": [{"namespace": "catalog", "name": "tickets"}],
   "job": {"namespace": "support", "name": "ticket.create"},
   "run": {
-    "runId": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+    "runId": "9b2f4c1e-7d3a-4e58-b6c0-2a1f8e5d4c37",
     "facets": {
       "parent": {"_producer": "...", "_schemaURL": "...", "run": {"runId": "..."}},
       "ashOpenLineageProducer": {
         "_producer": "...", "_schemaURL": "...",
-        "producer_name": "support.ticket.create"
+        "producer_name": "support.ticket.create",
+        "correlationId": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+        "depth": 0
       }
     }
   }
@@ -119,9 +120,14 @@ disappears from the graph while still costing money.
 * The dataset comes from the resource's `postgres do table end` declaration
   (schema-qualified when a schema is set). A resource with no postgres table
   contributes **no dataset** rather than a guess.
-* `runId` is the host's correlation id — one lookup joins the audit trail, the
-  logs and the lineage graph. Depth above zero adds the `parent` facet; the
-  parent's id comes from `:parent_id_provider` or the facet is omitted.
+* `runId` is derived from the host's correlation id and the job —
+  `sha256("{correlation}/{namespace}/{job}")` formatted UUID-shaped — so each
+  job gets its own run within one correlation, and repeat invocations of the
+  same job in that correlation share it. The correlation id itself travels in
+  the `ashOpenLineageProducer` facet as `correlationId` (with `depth`); that
+  field is what joins the audit trail, the logs and the lineage graph. Depth
+  above zero adds the `parent` facet; the parent's id comes from
+  `:parent_id_provider` or the facet is omitted.
 * START/FAIL for resource actions are deliberately out of scope (ADR 0012): a
   notifier can only state what already happened. The host emits its own START
   via `AshOpenLineage.emit/2` before a call when it wants one.

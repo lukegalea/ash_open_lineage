@@ -4,8 +4,8 @@
 
 defmodule AshOpenLineage do
   @moduledoc """
-  The first Elixir OpenLineage emitter: an Ash extension plus a small public
-  API, speaking spec **2-0-2** RunEvents.
+  An Elixir OpenLineage emitter: an Ash extension plus a small public API,
+  speaking spec **2-0-2** RunEvents.
 
   Two halves:
 
