@@ -6,10 +6,15 @@ defmodule AshOpenLineage.CorrelationProvider do
   @moduledoc """
   Where run ids and nesting depth come from.
 
-  A lineage run id is most useful when it *is* the host's correlation id: one
-  lookup then joins every audit row, log line and lineage event for an
-  operation. That is why this is a behaviour the host implements, not a UUID
-  minted here.
+  The notifier derives each run id from the host's correlation id and the job
+  (one run per correlation and job), and carries the correlation id itself in
+  the `ashOpenLineageProducer` facet as `correlationId`. That field joins a
+  lineage event to the host's audit rows (and log lines, if the host logs the
+  same id) only when `id/0` is stable for the whole operation; the library
+  writes it into the facet and nothing else. That is why this is a behaviour
+  the host implements, not a UUID minted here. `AshOpenLineage.emit/2`
+  and `AshOpenLineage.fail/3` use `id/0` as the run id directly when no
+  `:run_id` is passed.
 
   Configure per host:
 

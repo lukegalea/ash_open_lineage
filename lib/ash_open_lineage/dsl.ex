@@ -66,7 +66,7 @@ defmodule AshOpenLineage.Dsl do
         doc:
           "Action types that emit a COMPLETE RunEvent. Reads are never emitted. START/FAIL for " <>
             "resource actions are deliberately out of scope (ADR 0012): the host emits those " <>
-            "itself via `AshOpenLineage.emit/2` and `AshOpenLineage.fail/2` for jobs it drives."
+            "itself via `AshOpenLineage.emit/2` and `AshOpenLineage.fail/3` for jobs it drives."
       ]
     ]
   }

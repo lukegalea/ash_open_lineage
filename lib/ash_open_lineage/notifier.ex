@@ -17,7 +17,7 @@ defmodule AshOpenLineage.Notifier do
   FAIL describe *intentions*, which belong to whoever drives the work (ADR
   0012's framing). For resource actions the host emits START itself before the
   call if it wants one; for non-Ash jobs `AshOpenLineage.emit/2` and
-  `AshOpenLineage.fail/2` cover the pair.
+  `AshOpenLineage.fail/3` cover the pair.
 
   ## runId and depth
 
