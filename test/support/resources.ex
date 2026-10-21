@@ -23,6 +23,7 @@ defmodule AshOpenLineage.Test.Catalog do
     resource AshOpenLineage.Test.Selective
     resource AshOpenLineage.Test.PostgresThing
     resource AshOpenLineage.Test.SchemaedThing
+    resource AshOpenLineage.Test.Send1Thing
   end
 end
 
@@ -145,6 +146,51 @@ defmodule AshOpenLineage.Test.SchemaedThing do
 
   lineage do
     transport(AshOpenLineage.Transport.InMemory)
+  end
+end
+
+defmodule AshOpenLineage.Test.Send1Transport do
+  @moduledoc """
+  A transport written before `send/2` existed: it exports `send/1` only. It
+  forwards to `AshOpenLineage.Transport.InMemory.send/1`, so the stored entry's
+  meta is `%{}` — proof the one-argument path was taken.
+  """
+
+  @behaviour AshOpenLineage.Transport
+
+  @impl true
+  def send(event), do: AshOpenLineage.Transport.InMemory.send(event)
+end
+
+defmodule AshOpenLineage.Test.Send1Thing do
+  @moduledoc "ETS-backed resource whose transport only implements `send/1`."
+
+  use Ash.Resource,
+    domain: AshOpenLineage.Test.Catalog,
+    data_layer: Ash.DataLayer.Ets,
+    extensions: [AshOpenLineage.Extension]
+
+  ets do
+    private? true
+  end
+
+  multitenancy do
+    strategy :context
+    global? true
+  end
+
+  attributes do
+    uuid_primary_key :id
+    attribute :name, :string, allow_nil?: false, public?: true
+  end
+
+  actions do
+    default_accept :*
+    defaults [:create, :read]
+  end
+
+  lineage do
+    transport(AshOpenLineage.Test.Send1Transport)
   end
 end
 

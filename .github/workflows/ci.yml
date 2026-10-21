@@ -1,0 +1,45 @@
+# SPDX-FileCopyrightText: 2026 Luke Galea
+#
+# SPDX-License-Identifier: MIT
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    name: format, compile, test
+    runs-on: ubuntu-latest
+    env:
+      MIX_ENV: test
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: erlef/setup-beam@v1
+        with:
+          otp-version: "27"
+          elixir-version: "1.18"
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            deps
+            _build
+          key: mix-${{ runner.os }}-otp27-elixir1.18-${{ hashFiles('mix.lock') }}
+          restore-keys: mix-${{ runner.os }}-otp27-elixir1.18-
+
+      - run: mix deps.get
+
+      - name: mix format --check-formatted
+        run: mix format --check-formatted
+
+      - name: mix compile --warnings-as-errors
+        run: mix compile --warnings-as-errors
+        env:
+          MIX_ENV: dev
+
+      - name: mix test
+        run: mix test

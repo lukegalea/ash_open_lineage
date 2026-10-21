@@ -11,6 +11,9 @@ defmodule AshOpenLineage.LeakTest do
   only then is it trusted with real events built with an actor and a tenant
   injected into the changeset context, the actor option and the tenant option —
   every channel a facet could ever reach.
+
+  Transports exporting `send/2` receive the tenant as host metadata; the
+  `send/2` tests here show it arrives there while the event stays clean.
   """
 
   use ExUnit.Case, async: true
@@ -74,6 +77,45 @@ defmodule AshOpenLineage.LeakTest do
     [event] = InMemory.events()
     assert event["eventType"] == "COMPLETE"
     event |> Jason.encode!() |> Jason.decode!() |> then(&assert_clean!(&1, forbidden()))
+  end
+
+  describe "host metadata for send/2 transports" do
+    # The tenant reaches the transport as meta — that is the point of send/2 —
+    # and the event built for the same action still carries none of it.
+
+    test "a create's tenant reaches the transport's meta, not the event" do
+      Ash.Changeset.for_create(Thing, :create, %{name: "harmless"})
+      |> Ash.create!(actor: %{id: @actor_id, email: @actor_email}, tenant: @tenant)
+
+      [{event, meta}] = InMemory.entries()
+
+      assert meta == %{tenant: @tenant, resource: Thing, action: :create}
+
+      event |> Jason.encode!() |> Jason.decode!() |> then(&assert_clean!(&1, forbidden()))
+      assert_clean!(event, forbidden())
+    end
+
+    test "a destroy's tenant reaches the transport's meta, not the event" do
+      thing =
+        Ash.create!(Ash.Changeset.for_create(Thing, :create, %{name: "harmless"}),
+          tenant: @tenant
+        )
+
+      InMemory.clear()
+
+      Ash.destroy!(thing, actor: %{id: @actor_id, email: @actor_email}, tenant: @tenant)
+
+      [{event, meta}] = InMemory.entries()
+
+      assert meta == %{tenant: @tenant, resource: Thing, action: :destroy}
+      event |> Jason.encode!() |> Jason.decode!() |> then(&assert_clean!(&1, forbidden()))
+    end
+
+    test "no tenant on the action is a nil tenant in meta" do
+      Ash.create!(Ash.Changeset.for_create(Thing, :create, %{name: "harmless"}))
+
+      assert [{_event, %{tenant: nil, resource: Thing, action: :create}}] = InMemory.entries()
+    end
   end
 
   defp forbidden, do: [@tenant, @actor_id, @actor_email]
