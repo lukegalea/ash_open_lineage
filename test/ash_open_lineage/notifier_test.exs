@@ -163,11 +163,13 @@ defmodule AshOpenLineage.NotifierTest do
 
   # Mirrors the notifier's derivation: one stable run per (correlation, job).
   defp derived_run_id(correlation_id, namespace, job_name) do
-    <<a::binary-size(8), b::binary-size(4), c::binary-size(4), d::binary-size(4),
-      e::binary-size(12), _::binary>> =
+    hex =
       :crypto.hash(:sha256, correlation_id <> "/" <> namespace <> "/" <> job_name)
       |> Base.encode16(case: :lower)
 
-    "#{a}-#{b}-#{c}-#{d}-#{e}"
+    # sliced independently of the library's binary patterns
+    Enum.map_join([{0, 8}, {8, 4}, {12, 4}, {16, 4}, {20, 12}], "-", fn {start, length} ->
+      binary_part(hex, start, length)
+    end)
   end
 end

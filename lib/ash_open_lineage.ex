@@ -163,10 +163,14 @@ defmodule AshOpenLineage do
     # keeps its own run. Multiple invocations of the SAME job inside one
     # correlation share that run deliberately: a run is a job execution, and
     # re-emission updates it.
-    <<a::binary-size(8), b::binary-size(4), c::binary-size(4), d::binary-size(4),
-      e::binary-size(12), _::binary>> =
+    hex =
       :crypto.hash(:sha256, correlation_id <> "/" <> namespace <> "/" <> job_name)
       |> Base.encode16(case: :lower)
+
+    # Two short patterns rather than one wrapped one: Elixir 1.18 and 1.19+
+    # format a multi-line binary pattern differently.
+    <<a::binary-size(8), b::binary-size(4), c::binary-size(4), rest::binary>> = hex
+    <<d::binary-size(4), e::binary-size(12), _::binary>> = rest
 
     "#{a}-#{b}-#{c}-#{d}-#{e}"
   end
