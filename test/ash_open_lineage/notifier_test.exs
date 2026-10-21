@@ -47,7 +47,7 @@ defmodule AshOpenLineage.NotifierTest do
 
     # derived runId: sha256-based, well-formed UUID shape (no version nibble)
     assert event["run"]["runId"] =~
-           ~r/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
+             ~r/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 
     refute Map.has_key?(event["run"]["facets"], "parent")
   end
@@ -127,13 +127,49 @@ defmodule AshOpenLineage.NotifierTest do
     assert AshOpenLineage.Info.resource_dataset(Thing) == nil
   end
 
+  test "AshOpenLineage.run_id/3 is the runId the notifier emits" do
+    Application.put_env(:ash_open_lineage, :correlation_provider, Correlation)
+
+    Ash.create!(Ash.Changeset.for_create(Thing, :create, %{name: "widget"}))
+
+    assert [event] = InMemory.events()
+    run_id = AshOpenLineage.run_id(Correlation.id(), "catalog", "thing.create")
+
+    assert event["run"]["runId"] == run_id
+    assert run_id == derived_run_id(Correlation.id(), "catalog", "thing.create")
+    # pinned, so a change to the derivation cannot pass unnoticed
+    assert run_id == "8eb5949c-4571-09a1-1e79-064f8c11510a"
+  end
+
+  test "a transport exporting only send/1 still receives every event" do
+    alias AshOpenLineage.Test.Send1Thing
+
+    Ash.create!(Ash.Changeset.for_create(Send1Thing, :create, %{name: "widget"}),
+      tenant: "t-1"
+    )
+
+    # the entry went in through InMemory.send/1, so no meta came with it
+    assert [{%{"eventType" => "COMPLETE", "job" => %{"name" => "send1_thing.create"}}, meta}] =
+             InMemory.entries()
+
+    assert meta == %{}
+  end
+
+  test "send/2 transports receive tenant, resource and action as meta" do
+    Ash.create!(Ash.Changeset.for_create(Thing, :create, %{name: "widget"}), tenant: "t-1")
+
+    assert [{_event, %{tenant: "t-1", resource: Thing, action: :create}}] = InMemory.entries()
+  end
+
   # Mirrors the notifier's derivation: one stable run per (correlation, job).
   defp derived_run_id(correlation_id, namespace, job_name) do
-    <<a::binary-size(8), b::binary-size(4), c::binary-size(4), d::binary-size(4),
-      e::binary-size(12), _::binary>> =
+    hex =
       :crypto.hash(:sha256, correlation_id <> "/" <> namespace <> "/" <> job_name)
       |> Base.encode16(case: :lower)
 
-    "#{a}-#{b}-#{c}-#{d}-#{e}"
+    # sliced independently of the library's binary patterns
+    Enum.map_join([{0, 8}, {8, 4}, {12, 4}, {16, 4}, {20, 12}], "-", fn {start, length} ->
+      binary_part(hex, start, length)
+    end)
   end
 end

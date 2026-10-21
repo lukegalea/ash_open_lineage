@@ -123,6 +123,62 @@ defmodule AshOpenLineage.PublicApiTest do
     end
   end
 
+  describe ":meta" do
+    import AshOpenLineage.TestSupport.LeakCheck, only: [assert_clean!: 2]
+
+    @meta %{tenant: "tenant-meta-only-31", pipeline: "pipeline-meta-only-7"}
+
+    test "emit hands :meta to a send/2 transport and keeps it out of the event" do
+      assert :ok = AshOpenLineage.emit(@gmail_job, run_id: @run_id, meta: @meta)
+
+      assert [{event, meta}] = InMemory.entries()
+      assert meta == @meta
+      assert event["eventType"] == "COMPLETE"
+      event |> Jason.encode!() |> Jason.decode!() |> then(&assert_clean!(&1, forbidden_meta()))
+      assert_clean!(event, forbidden_meta())
+    end
+
+    test "fail hands :meta to a send/2 transport and keeps it out of the event" do
+      assert :ok = AshOpenLineage.fail(@gmail_job, "tap crashed", run_id: @run_id, meta: @meta)
+
+      assert [{event, meta}] = InMemory.entries()
+      assert meta == @meta
+      assert event["eventType"] == "FAIL"
+      event |> Jason.encode!() |> Jason.decode!() |> then(&assert_clean!(&1, forbidden_meta()))
+    end
+
+    test "without :meta a send/2 transport receives an empty map" do
+      AshOpenLineage.emit(@gmail_job)
+      AshOpenLineage.fail(@gmail_job, "boom")
+
+      assert [{_, first_meta}, {_, second_meta}] = InMemory.entries()
+      assert first_meta == %{}
+      assert second_meta == %{}
+    end
+
+    test "a send/1-only transport still works, and :meta is dropped" do
+      Application.put_env(:ash_open_lineage, :transport, AshOpenLineage.Test.Send1Transport)
+
+      assert :ok = AshOpenLineage.emit(@gmail_job, meta: @meta)
+      assert :ok = AshOpenLineage.fail(@gmail_job, "boom", meta: @meta)
+
+      # the entries went in through InMemory.send/1: no meta came with them
+      assert [{%{"eventType" => "COMPLETE"}, first_meta}, {%{"eventType" => "FAIL"}, second_meta}] =
+               InMemory.entries()
+
+      assert first_meta == %{}
+      assert second_meta == %{}
+    end
+
+    test "a non-map :meta is an ArgumentError" do
+      assert_raise ArgumentError, ~r/:meta must be a map/, fn ->
+        AshOpenLineage.emit(@gmail_job, meta: [tenant: "t-1"])
+      end
+    end
+
+    defp forbidden_meta, do: Map.values(@meta)
+  end
+
   test "the Req transport reports a missing base url as an error, never a raise" do
     Application.delete_env(:ash_open_lineage, :http_base_url)
 

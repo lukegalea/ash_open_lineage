@@ -25,12 +25,21 @@ defmodule AshOpenLineage.Notifier do
   job* — one stable run per (correlation, job) pair. Reusing the bare
   correlation id across several jobs collapses distinct jobs into one consumer
   run; the derivation keeps runs distinct while staying derivable from the
-  audit log's correlation id. A depth above zero marks the
+  audit log's correlation id (`AshOpenLineage.run_id/3` is the derivation,
+  public so hosts can reproduce it). A depth above zero marks the
   action as nested under an outer operation and adds the `parent` run facet,
   with the parent's id read from the optional `:parent_id_provider` application
   env (a module exporting `parent_id/0`). With no provider configured the parent
   facet is omitted rather than given a fabricated parent id — see
   `AshOpenLineage.CorrelationProvider` for the seam.
+
+  ## Host metadata
+
+  The event goes out through `AshOpenLineage.Transport.dispatch/3`. A
+  transport that exports `send/2` also receives
+  `%{tenant: tenant, resource: resource, action: action_name}`, where `tenant`
+  is the notification's changeset tenant (`nil` when there is none). That map
+  is host context for the transport only — none of it enters the event.
 
   ## Failure posture
 
@@ -66,8 +75,9 @@ defmodule AshOpenLineage.Notifier do
 
     if action.type in AshOpenLineage.Info.lineage_emit_on!(resource) do
       event = AshOpenLineage.Event.run_event(event_opts(notification))
+      transport = AshOpenLineage.Info.lineage_transport!(resource)
 
-      case send_event(AshOpenLineage.Info.lineage_transport!(resource), event) do
+      case AshOpenLineage.Transport.dispatch(transport, event, transport_meta(notification)) do
         :ok ->
           :ok
 
@@ -80,8 +90,17 @@ defmodule AshOpenLineage.Notifier do
     end
   end
 
-  # A guard so the checker sees an atom dispatch, not a maybe-tuple module.
-  defp send_event(transport, event) when is_atom(transport), do: transport.send(event)
+  # Host context for a transport exporting send/2 — never part of the event.
+  defp transport_meta(notification) do
+    %{
+      tenant: tenant(notification.changeset),
+      resource: notification.resource,
+      action: notification.action.name
+    }
+  end
+
+  defp tenant(%{tenant: tenant}), do: tenant
+  defp tenant(_no_changeset), do: nil
 
   defp event_opts(notification) do
     resource = notification.resource
@@ -97,32 +116,13 @@ defmodule AshOpenLineage.Notifier do
       job_name: job_name,
       inputs: inputs,
       outputs: outputs,
-      run_id: run_id(correlation.id(), namespace, job_name),
+      run_id: AshOpenLineage.run_id(correlation.id(), namespace, job_name),
       parent_run_id: parent_run_id(correlation.depth()),
       correlation_id: correlation.id(),
       correlation_depth: correlation.depth(),
       producer: AshOpenLineage.Info.lineage_producer!(resource),
       producer_name: "#{namespace}.#{job_name}"
     ]
-  end
-
-  # One OpenLineage run per (correlation, job) pair, NOT per correlation.
-  # A correlation id routinely spans several different jobs — one user action
-  # writing several tables — and reusing one runId across jobs makes every
-  # consumer (Marquez included) collapse them into a single run whose job
-  # association flips per event: the runs simply vanish. Deriving a stable,
-  # deterministic UUID per (correlation, namespace, job) keeps the audit-log
-  # join ("lineage for this audit entry") a bounded lookup — all runs of one
-  # correlation share a prefix-derivable id space — while each job keeps its
-  # own run. Multiple invocations of the SAME job inside one correlation share
-  # that run deliberately: a run is a job execution, and re-emission updates it.
-  defp run_id(correlation_id, namespace, job_name) do
-    <<a::binary-size(8), b::binary-size(4), c::binary-size(4), d::binary-size(4),
-      e::binary-size(12), _::binary>> =
-      :crypto.hash(:sha256, correlation_id <> "/" <> namespace <> "/" <> job_name)
-      |> Base.encode16(case: :lower)
-
-    "#{a}-#{b}-#{c}-#{d}-#{e}"
   end
 
   defp parent_run_id(0), do: nil

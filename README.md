@@ -143,9 +143,60 @@ disappears from the graph while still costing money.
   Errors return as `{:error, term}`, never raise.
 * `AshOpenLineage.Transport.InMemory` — Agent-backed store with `events/0`,
   for tests and dev (`start_supervised!(AshOpenLineage.Transport.InMemory)`).
+  `entries/0` returns `{event, meta}` pairs, for tests that check host
+  metadata.
 
 Anything implementing `send(event :: map()) :: :ok | {:error, term()}` works
 with the `transport` DSL option.
+
+### Host metadata (`send/2`)
+
+A transport may also implement the optional callback
+`send(event, meta) :: :ok | {:error, term()}`. When it does, the library calls
+it instead of `send/1` (`AshOpenLineage.Transport.dispatch/3` makes the
+choice), and `meta` carries host context the event never does:
+
+* from the notifier: `%{tenant: tenant, resource: resource, action: action_name}`,
+  where `tenant` is the action's changeset tenant, or `nil`;
+* from `emit/2` and `fail/3`: whatever map you pass as the `:meta` option
+  (default `%{}`).
+
+This is for a host transport that stores events in its own database and needs
+to scope the rows, typically by tenant:
+
+```elixir
+defmodule MyApp.Lineage.StoreTransport do
+  @behaviour AshOpenLineage.Transport
+
+  @impl true
+  # qualified: an unqualified send/2 would clash with Kernel.send/2
+  def send(event), do: __MODULE__.send(event, %{})
+
+  @impl true
+  def send(event, meta) do
+    MyApp.Lineage.store_event(event, tenant: meta[:tenant])
+  end
+end
+
+AshOpenLineage.emit(job, run_id: run_id, meta: %{tenant: tenant})
+```
+
+`meta` stays in-process. The library never serialises it and never copies any
+of it into the event, and `AshOpenLineage.Transport.Req` ignores it. The leak
+rule is about the event and still holds; the leak test checks that a tenant
+reaches `meta` while the event built for the same action stays clean.
+
+### Run ids for your own jobs
+
+`AshOpenLineage.run_id(correlation_id, namespace, job_name)` is the
+derivation the notifier uses for resource jobs. A host emitting its own jobs
+inside one correlation can pass it as `:run_id`, so each job gets its own
+stable run just as resource jobs do:
+
+```elixir
+run_id = AshOpenLineage.run_id(correlation_id, "ingestion", "gmail.sync")
+AshOpenLineage.emit(job, event_type: :start, run_id: run_id)
+```
 
 ## Testing your own integration
 

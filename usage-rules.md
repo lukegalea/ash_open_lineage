@@ -43,14 +43,26 @@ next to the README when feeding an agent or LLM.
   three events form one run. An explicit `run_id` is used verbatim; without
   one, `emit/2`/`fail/3` take the correlation provider's `id/0` as is (no
   per-job derivation, and no `correlationId` or `depth` in the facet unless
-  passed as `:correlation_id` / `:correlation_depth`).
+  passed as `:correlation_id` / `:correlation_depth`). To give a host job
+  its own stable run inside a correlation, the way resource jobs get one,
+  pass `run_id: AshOpenLineage.run_id(correlation_id, namespace, job_name)`.
+- **Use `send/2` when a transport needs host context.** A transport that
+  stores events in the host's database, scoped by tenant, implements the
+  optional `send(event, meta)` callback. The notifier passes
+  `%{tenant: tenant_or_nil, resource: resource, action: action_name}`;
+  `emit/2`/`fail/3` pass their `:meta` option (a map, default `%{}`).
+  Transports with only `send/1` keep working and never see `meta`.
 
 ## NEVER
 
 - **Never leak actor, tenant, or values into lineage.** Facets carry structural
   names only — job, resource, action, table. Never actor identities, never
   tenant ids, never filter/argument values, in any facet, ever. The suite's
-  leak test is the enforcement; any new facet needs to pass it.
+  leak test is the enforcement; any new facet needs to pass it. Transport
+  `meta` is not an exception to this: it is in-process context for the
+  transport, never serialised by the library and never copied into the
+  event. Don't move `meta` values into a facet or the event in a custom
+  transport either; store them beside the event (a tenant column, say).
 - **Never fabricate a parent.** Depth above zero without a configured
   `:parent_id_provider` omits the parent facet; don't "fix" that by inventing a
   parent id. Configure the provider instead.

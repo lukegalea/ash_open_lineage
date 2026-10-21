@@ -87,6 +87,11 @@ defmodule AshOpenLineage do
     * `:correlation_depth` — puts `depth` in that facet. Also absent unless
       passed.
     * `:event_time` — `%DateTime{}` or ISO8601 binary (tests; defaults to now).
+    * `:meta` — a map of host context (default `%{}`) handed to a transport
+      that exports `send/2`, e.g. `%{tenant: tenant}` for a transport that
+      stores events scoped by tenant. It goes to the transport only: nothing
+      in it is put into the event. A `send/1`-only transport never sees it.
+      See `AshOpenLineage.Transport`.
 
   Returns the transport's result: `:ok` or `{:error, term()}`.
   """
@@ -104,7 +109,7 @@ defmodule AshOpenLineage do
     |> event_opts(opts)
     |> Keyword.put(:event_type, event_type)
     |> AshOpenLineage.Event.run_event()
-    |> transport().send()
+    |> dispatch(opts)
   end
 
   @doc """
@@ -116,8 +121,9 @@ defmodule AshOpenLineage do
   `reason` may be a binary, an exception, or any term (inspected). The message
   lands in the `error` run facet's `errorMessage`. Accepts the same `:run_id`,
   `:parent_run_id`, `:root`, `:producer`, `:producer_name`, `:correlation_id`,
-  `:correlation_depth` and `:event_time` options as `emit/2` —
+  `:correlation_depth`, `:event_time` and `:meta` options as `emit/2` —
   pass the `run_id` the START used so the failure attaches to the same run.
+  As with `emit/2`, `:meta` reaches a `send/2` transport and never the event.
 
   Returns the transport's result: `:ok` or `{:error, term()}`.
   """
@@ -127,7 +133,46 @@ defmodule AshOpenLineage do
     |> event_opts(opts)
     |> Keyword.merge(event_type: :fail, error_message: format_reason(reason))
     |> AshOpenLineage.Event.run_event()
-    |> transport().send()
+    |> dispatch(opts)
+  end
+
+  @doc """
+  The runId for one job inside one correlation:
+  `sha256("{correlation_id}/{namespace}/{job_name}")`, lowercase hex, cut and
+  hyphenated into the 8-4-4-4-12 UUID shape (no version nibble is set).
+
+  This is the derivation the notifier uses for resource jobs, so each job in a
+  correlation gets its own stable run and repeat invocations of the same job
+  in that correlation share it. Hosts that emit their own jobs inside one
+  correlation pass it as `emit/2`'s `:run_id` to get the same behaviour:
+
+      run_id = AshOpenLineage.run_id(correlation_id, "ingestion", "gmail.sync")
+      AshOpenLineage.emit(job, event_type: :start, run_id: run_id)
+      AshOpenLineage.emit(job, event_type: :complete, run_id: run_id)
+  """
+  @spec run_id(String.t(), String.t(), String.t()) :: String.t()
+  def run_id(correlation_id, namespace, job_name)
+      when is_binary(correlation_id) and is_binary(namespace) and is_binary(job_name) do
+    # One OpenLineage run per (correlation, job) pair, NOT per correlation.
+    # A correlation id routinely spans several different jobs — one user action
+    # writing several tables — and reusing one runId across jobs makes every
+    # consumer (Marquez included) collapse them into a single run whose job
+    # association flips per event: the runs simply vanish. Deriving a stable,
+    # deterministic UUID per (correlation, namespace, job) keeps the audit-log
+    # join ("lineage for this audit entry") a bounded lookup while each job
+    # keeps its own run. Multiple invocations of the SAME job inside one
+    # correlation share that run deliberately: a run is a job execution, and
+    # re-emission updates it.
+    hex =
+      :crypto.hash(:sha256, correlation_id <> "/" <> namespace <> "/" <> job_name)
+      |> Base.encode16(case: :lower)
+
+    # Two short patterns rather than one wrapped one: Elixir 1.18 and 1.19+
+    # format a multi-line binary pattern differently.
+    <<a::binary-size(8), b::binary-size(4), c::binary-size(4), rest::binary>> = hex
+    <<d::binary-size(4), e::binary-size(12), _::binary>> = rest
+
+    "#{a}-#{b}-#{c}-#{d}-#{e}"
   end
 
   @doc "The producer URI used when no override is configured."
@@ -171,6 +216,17 @@ defmodule AshOpenLineage do
   end
 
   # --- plumbing ----------------------------------------------------------------
+
+  # :meta never reaches the event builder — event_opts/2 does not read it.
+  defp dispatch(event, opts) do
+    meta = Keyword.get(opts, :meta, %{})
+
+    unless is_map(meta) do
+      raise ArgumentError, ":meta must be a map, got: #{inspect(meta)}"
+    end
+
+    AshOpenLineage.Transport.dispatch(transport(), event, meta)
+  end
 
   defp event_opts(job, opts) do
     [
