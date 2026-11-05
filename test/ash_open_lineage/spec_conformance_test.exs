@@ -127,4 +127,35 @@ defmodule AshOpenLineage.SpecConformanceTest do
 
     assert ExJsonSchema.Validator.valid?(facet_schema, facet)
   end
+
+  test "the snapshot facet schema this library ships also validates its own facet" do
+    facet_schema =
+      File.read!("priv/openlineage/facets/ash_open_lineage_snapshot_facet.json")
+      |> Jason.decode!()
+      |> Map.delete("$schema")
+      |> ExJsonSchema.Schema.resolve()
+
+    snapshot =
+      struct(AshOpenLineage.Snapshot,
+        purpose: :personal_week,
+        inputs: [struct(AshOpenLineage.Snapshot.Input, key: "tasks.mine")],
+        definitions: [
+          struct(AshOpenLineage.Snapshot.Definition,
+            kind: :dmn,
+            key: "canonical.planning_requirements"
+          )
+        ],
+        digest: String.duplicate("ef", 32)
+      )
+
+    facet = AshOpenLineage.Event.snapshot_facet(snapshot)
+
+    assert ExJsonSchema.Validator.valid?(facet_schema, facet)
+
+    # and it rejects a wire payload with a key outside the schema
+    refute ExJsonSchema.Validator.valid?(
+             facet_schema,
+             Map.put(facet, "actor_id", "must not exist")
+           )
+  end
 end

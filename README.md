@@ -21,6 +21,12 @@ injecting an actor and a tenant into a run and asserting neither string appears
 anywhere in the event — and it proves the assertion bites by failing it against
 a deliberately-leaking map first.
 
+**Snapshot envelope scope:** the `AshOpenLineage.Snapshot` struct and the
+`ashOpenLineageSnapshot` run facet carry references and hashes only — digests,
+purposes, counts and definition kinds. The snapshot envelope never contains
+actor identities, tenant ids, or data values, and the facet reduces it further
+to a single digest fingerprint.
+
 ## Quickstart
 
 ```elixir

@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/lukegalea/ash_open_lineage/blob/main/priv/openlineage/facets/ash_open_lineage_snapshot_facet.json",
+  "title": "ashOpenLineageSnapshot (run facet)",
+  "description": "Digest-only run facet emitted by ash_open_lineage naming the AshOpenLineage.Snapshot a solve or check job consumed: its digest, purpose, input count, and distinct definition kinds. The snapshot envelope itself carries references and hashes only; this facet reduces it to the digest fingerprint. Never actor identities, tenant ids, input sources, or data values.",
+  "type": "object",
+  "properties": {
+    "_producer": {
+      "description": "URI identifying the producer of this metadata.",
+      "type": "string",
+      "format": "uri"
+    },
+    "_schemaURL": {
+      "description": "URL of this schema definition.",
+      "type": "string",
+      "format": "uri"
+    },
+    "digest": {
+      "description": "Lowercase hex SHA-256 digest of the snapshot's canonical JSON encoding (RFC 8785), excluding the digest field itself. Opaque fingerprint; never a data value.",
+      "type": "string"
+    },
+    "purpose": {
+      "description": "The snapshot's purpose as a snake_case string, e.g. \"personal_week\". Structural label only.",
+      "type": "string"
+    },
+    "input_count": {
+      "description": "How many inputs the snapshot declares. Count only - never the inputs themselves.",
+      "type": "integer",
+      "minimum": 0
+    },
+    "definition_kinds": {
+      "description": "Distinct definition kinds the snapshot declares, e.g. [\"dmn\", \"mzn\"]. Kinds only - never keys, versions, or content.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    }
+  },
+  "required": ["_producer", "_schemaURL", "digest", "purpose", "input_count", "definition_kinds"],
+  "additionalProperties": false
+}

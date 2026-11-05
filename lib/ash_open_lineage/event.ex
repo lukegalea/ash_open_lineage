@@ -41,6 +41,20 @@ defmodule AshOpenLineage.Event do
   # repository is public at the same path.
   @producer_facet_schema_url "https://github.com/lukegalea/ash_open_lineage/blob/main/priv/openlineage/facets/ash_open_lineage_producer_facet.json"
 
+  @snapshot_facet_name "ashOpenLineageSnapshot"
+
+  @snapshot_facet_schema_url "https://github.com/lukegalea/ash_open_lineage/blob/main/priv/openlineage/facets/ash_open_lineage_snapshot_facet.json"
+
+  # The leak boundary: a facet string must never be caller-supplied data. An
+  # atom like `:"tenant-acme-corp-42"` passed as a purpose or definition kind
+  # would ride Atom.to_string/1 straight onto the wire, so the builder is total
+  # over NO atoms — every purpose/kind must be on these lists. Extending a list
+  # is a deliberate first-party edit (plus a schema/leak-test touch), never a
+  # call-site option.
+  @purposes [:personal_week]
+
+  @definition_kinds [:dmn, :bpmn, :mzn, :validator]
+
   @type event_type :: :start | :complete | :fail
 
   @type dataset_descriptor ::
@@ -53,6 +67,78 @@ defmodule AshOpenLineage.Event do
   @doc "The facet key under which this library's custom producer facet is emitted."
   @spec producer_facet_name() :: String.t()
   def producer_facet_name, do: @producer_facet_name
+
+  @doc "The facet key under which this library's snapshot digest facet is emitted."
+  @spec snapshot_facet_name() :: String.t()
+  def snapshot_facet_name, do: @snapshot_facet_name
+
+  @doc """
+  Builds the `ashOpenLineageSnapshot` run facet from an
+  `t:AshOpenLineage.Snapshot.t/0`.
+
+  Digest and structural values only: the snapshot's digest, its purpose atom
+  (as a snake_case string), the input count, and the distinct definition
+  kinds. It never carries the snapshot's authority map (tenant/actor), input
+  sources, or any data values — the envelope is references and hashes, and
+  this facet reduces it to a digest fingerprint. The leak test enforces the
+  boundary.
+
+  Purposes and definition kinds are allow-listed (`@purposes`,
+  `@definition_kinds`), and the digest must be a lowercase 64-hex SHA-256
+  (`"^[0-9a-f]{64}$"`); any other atom or binary — one that could smuggle a
+  data-bearing value onto the wire — raises `ArgumentError`. Validation only:
+  deriving the digest stays `AshOpenLineage.Snapshot.put_digest/1`'s job.
+  Extending a list is a deliberate first-party edit, not a call-site option.
+  """
+  @spec snapshot_facet(AshOpenLineage.Snapshot.t(), String.t()) :: map()
+  def snapshot_facet(%AshOpenLineage.Snapshot{} = snapshot, producer \\ @producer) do
+    %{
+      "_producer" => producer,
+      "_schemaURL" => @snapshot_facet_schema_url,
+      "digest" => digest_string!(snapshot.digest),
+      "purpose" => purpose_string!(snapshot.purpose),
+      "input_count" => length(snapshot.inputs),
+      "definition_kinds" =>
+        snapshot.definitions |> Enum.map(&kind_string!(&1.kind)) |> Enum.uniq()
+    }
+  end
+
+  # A digest is a fingerprint, so the facet string must be exactly a lowercase
+  # hex SHA-256 — never a caller-chosen binary. A nil digest is missing input
+  # for a digest-only facet (run Snapshot.put_digest/1 first), not a valid one.
+  defp digest_string!(digest) when is_binary(digest) do
+    if Regex.match?(~r/^[0-9a-f]{64}$/, digest) do
+      digest
+    else
+      raise ArgumentError,
+            "invalid snapshot digest #{inspect(digest)} — the ashOpenLineageSnapshot " <>
+              "facet requires a lowercase 64-hex SHA-256; compute it with " <>
+              "AshOpenLineage.Snapshot.put_digest/1"
+    end
+  end
+
+  defp digest_string!(other) do
+    raise ArgumentError,
+          "invalid snapshot digest #{inspect(other)} — the ashOpenLineageSnapshot " <>
+            "facet requires a lowercase 64-hex SHA-256; compute it with " <>
+            "AshOpenLineage.Snapshot.put_digest/1"
+  end
+
+  defp purpose_string!(purpose) when purpose in @purposes, do: Atom.to_string(purpose)
+
+  defp purpose_string!(other) do
+    raise ArgumentError,
+          "invalid snapshot purpose #{inspect(other)} — the ashOpenLineageSnapshot " <>
+            "facet only allows #{inspect(@purposes)}"
+  end
+
+  defp kind_string!(kind) when kind in @definition_kinds, do: Atom.to_string(kind)
+
+  defp kind_string!(other) do
+    raise ArgumentError,
+          "invalid snapshot definition kind #{inspect(other)} — the ashOpenLineageSnapshot " <>
+            "facet only allows #{inspect(@definition_kinds)}"
+  end
 
   @doc """
   Builds one RunEvent as a string-keyed map, ready for `Jason.encode!/1` or any
