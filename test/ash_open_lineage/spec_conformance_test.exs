@@ -137,7 +137,7 @@ defmodule AshOpenLineage.SpecConformanceTest do
 
     snapshot =
       struct(AshOpenLineage.Snapshot,
-        purpose: :personal_week,
+        purpose: :"planning.personal_week",
         inputs: [struct(AshOpenLineage.Snapshot.Input, key: "tasks.mine")],
         definitions: [
           struct(AshOpenLineage.Snapshot.Definition,

@@ -119,8 +119,8 @@ defmodule AshOpenLineage.Snapshot.CanonicalJSONTest do
     end
 
     test "module atoms render as dotted alias strings, enum atoms as snake_case" do
-      assert CanonicalJSON.encode!(%{"m" => Some.Module, "e" => :needs_input, "w" => :real}) ==
-               ~s({"e":"needs_input","m":"Some.Module","w":"real"})
+      assert CanonicalJSON.encode!(%{"m" => Some.Module, "e" => :unresolved, "w" => :scenario}) ==
+               ~s({"e":"unresolved","m":"Some.Module","w":"scenario"})
     end
 
     test "nil renders as null" do
@@ -146,7 +146,7 @@ defmodule AshOpenLineage.Snapshot.CanonicalJSONTest do
   end
 
   describe "snapshot envelope" do
-    @golden_digest "5fccbe3b69500b74c9eaa77fc4693774e043b6380f587374c89dc13856a0f994"
+    @golden_digest "2be6f74cd9c618c1c0d0513b1acada801eda16113e21e6f33b86d542b73c036d"
 
     defp golden_snapshot do
       {:ok, eff, _} = DateTime.from_iso8601("2026-11-05T08:30:00.123456Z")
@@ -154,30 +154,30 @@ defmodule AshOpenLineage.Snapshot.CanonicalJSONTest do
 
       %Snapshot{
         id: "019a2c7e-4b1d-7c2e-9f3a-5d6e7f8a9b0c",
-        purpose: :personal_week,
+        purpose: :"planning.personal_week",
         effective_at: eff,
         knowledge_cutoff: cut,
-        world: :real,
+        world: :operational,
         authority: %{tenant: "t-demo-01", actor_id: "usr-042", completeness: :full},
         inputs: [
           %Snapshot.Input{
             key: "task.alpha",
             role: :demand,
-            status: :resolved,
+            status: :value,
             source: %{resource: "Task", id: "task-1", version_number: 7},
             content_hash: "aa11"
           },
           %Snapshot.Input{
             key: "policy.hours",
             role: :parameter,
-            status: :resolved,
+            status: :value,
             source: %{resource: "Policy", id: "pol-9", version_number: 2},
             content_hash: "bb22"
           },
           %Snapshot.Input{
             key: "policy.hours",
             role: :constraint,
-            status: :needs_input,
+            status: :unresolved,
             source: nil,
             content_hash: nil
           }

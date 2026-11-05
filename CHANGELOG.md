@@ -3,7 +3,16 @@
 
 # Changelog
 
-## Unreleased — Snapshot value contract
+## 0.2.1 — Vocabulary reconciliation
+
+Reconciled the shared snapshot vocabulary to the #147 extraction terms
+(owner decision 2026-11-05): dotted purposes, `world` becomes
+`:operational | :scenario`, input `status` becomes
+`:value | :unresolved | :invalid | :missing_citation`. Definition kinds are
+unchanged. The cross-host golden digest changed accordingly (envelope
+content changed); the old constant is retired.
+
+## 0.2.0 — Snapshot value contract
 
 - **Added** `AshOpenLineage.Snapshot` — a pure value struct (plus nested
   `Snapshot.Input` / `Snapshot.Definition` structs) describing the knowledge

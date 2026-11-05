@@ -7,6 +7,12 @@ defmodule AshOpenLineage.Snapshot do
   with which resolved inputs and which pinned model definitions. It carries
   references and hashes only — never resource payloads.
 
+  Shared vocabulary (owner decision 2026-11-05, reconciliation round 0.2.1):
+  `purpose` is a dotted atom (e.g. `:"extraction.quote_v1"`,
+  `:"planning.personal_week"`, extensible by deliberate first-party edit);
+  `world` is `:operational | :scenario`; input `status` is
+  `:value | :unresolved | :invalid | :missing_citation`.
+
   Pure data: no Ash dependency. Digest computation lives in
   `AshOpenLineage.Snapshot.CanonicalJSON` (RFC 8785 canonical JSON).
   """
@@ -23,7 +29,7 @@ defmodule AshOpenLineage.Snapshot do
             required(:version_number) => integer()
           }
 
-    @type status :: :resolved | :needs_input | :invalid | :missing_citation | atom()
+    @type status :: :value | :unresolved | :invalid | :missing_citation | atom()
 
     @type t :: %__MODULE__{
             key: String.t(),
@@ -75,7 +81,7 @@ defmodule AshOpenLineage.Snapshot do
           purpose: atom(),
           effective_at: DateTime.t(),
           knowledge_cutoff: DateTime.t(),
-          world: :real | :simulation | atom(),
+          world: :operational | :scenario | atom(),
           authority: authority(),
           inputs: [Input.t()],
           definitions: [Definition.t()],

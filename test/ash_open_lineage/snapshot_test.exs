@@ -19,23 +19,23 @@ defmodule AshOpenLineage.SnapshotTest do
   def build_snapshot do
     %Snapshot{
       id: "019a2c7e-4b1d-7c2e-9f3a-5d6e7f8a9b0c",
-      purpose: :personal_week,
+      purpose: :"planning.personal_week",
       effective_at: effective_at(),
       knowledge_cutoff: knowledge_cutoff(),
-      world: :real,
+      world: :operational,
       authority: %{tenant: "t-demo-01", actor_id: "usr-042", completeness: :full},
       inputs: [
         %Snapshot.Input{
           key: "task.alpha",
           role: :demand,
-          status: :resolved,
+          status: :value,
           source: %{resource: "Task", id: "task-1", version_number: 7},
           content_hash: "aa11"
         },
         %Snapshot.Input{
           key: "policy.hours",
           role: :constraint,
-          status: :needs_input,
+          status: :unresolved,
           source: nil,
           content_hash: nil
         }
@@ -59,10 +59,10 @@ defmodule AshOpenLineage.SnapshotTest do
 
       assert %Snapshot{} = snap
       assert is_binary(snap.id)
-      assert snap.purpose == :personal_week
+      assert snap.purpose == :"planning.personal_week"
       assert %DateTime{} = snap.effective_at
       assert %DateTime{} = snap.knowledge_cutoff
-      assert snap.world == :real
+      assert snap.world == :operational
       assert %{tenant: _, actor_id: _, completeness: _} = snap.authority
       assert length(snap.inputs) == 2
       assert length(snap.definitions) == 2
@@ -98,11 +98,11 @@ defmodule AshOpenLineage.SnapshotTest do
 
       mutations = [
         {"id", &%{&1 | id: "other-id"}},
-        {"purpose", &%{&1 | purpose: :staffing}},
+        {"purpose", &%{&1 | purpose: :"extraction.quote_v1"}},
         {"effective_at", &%{&1 | effective_at: DateTime.add(&1.effective_at, 1, :second)}},
         {"knowledge_cutoff",
          &%{&1 | knowledge_cutoff: DateTime.add(&1.knowledge_cutoff, 1, :second)}},
-        {"world", &%{&1 | world: :simulation}},
+        {"world", &%{&1 | world: :scenario}},
         {"authority.tenant", &%{&1 | authority: %{&1.authority | tenant: "t-other"}}},
         {"authority.actor_id", &%{&1 | authority: %{&1.authority | actor_id: "usr-999"}}},
         {"authority.completeness", &%{&1 | authority: %{&1.authority | completeness: :partial}}},

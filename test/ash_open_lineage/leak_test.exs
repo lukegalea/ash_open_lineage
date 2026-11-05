@@ -141,7 +141,7 @@ defmodule AshOpenLineage.LeakTest do
                ])
 
       assert facet["digest"] == snapshot.digest
-      assert facet["purpose"] == "personal_week"
+      assert facet["purpose"] == "planning.personal_week"
       assert facet["input_count"] == 1
       assert facet["definition_kinds"] == ["dmn"]
 
@@ -216,16 +216,16 @@ defmodule AshOpenLineage.LeakTest do
   defp base_snapshot do
     %Snapshot{
       id: "snap-1",
-      purpose: :personal_week,
+      purpose: :"planning.personal_week",
       effective_at: ~U[2026-11-05T00:00:00Z],
       knowledge_cutoff: ~U[2026-11-05T00:00:00Z],
-      world: :real,
+      world: :scenario,
       authority: %{tenant: @tenant, actor_id: @actor_id, completeness: :full},
       inputs: [
         %Snapshot.Input{
           key: "tasks.mine",
           role: :plannable,
-          status: :resolved,
+          status: :value,
           source: %{resource: "Task", id: @tenant, version_number: 1},
           content_hash: String.duplicate("aa", 32)
         }

@@ -51,7 +51,7 @@ defmodule AshOpenLineage.Event do
   # over NO atoms — every purpose/kind must be on these lists. Extending a list
   # is a deliberate first-party edit (plus a schema/leak-test touch), never a
   # call-site option.
-  @purposes [:personal_week]
+  @purposes [:"extraction.quote_v1", :"planning.personal_week"]
 
   @definition_kinds [:dmn, :bpmn, :mzn, :validator]
 
