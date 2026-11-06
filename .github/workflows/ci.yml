@@ -20,16 +20,16 @@ jobs:
 
       - uses: erlef/setup-beam@v1
         with:
-          otp-version: "27"
-          elixir-version: "1.18"
+          otp-version: "27.3.4"
+          elixir-version: "1.20.4"
 
       - uses: actions/cache@v4
         with:
           path: |
             deps
             _build
-          key: mix-${{ runner.os }}-otp27-elixir1.18-${{ hashFiles('mix.lock') }}
-          restore-keys: mix-${{ runner.os }}-otp27-elixir1.18-
+          key: mix-${{ runner.os }}-otp27.3.4-elixir1.20.4-${{ hashFiles('mix.lock') }}
+          restore-keys: mix-${{ runner.os }}-otp27.3.4-elixir1.20.4-
 
       - run: mix deps.get
 

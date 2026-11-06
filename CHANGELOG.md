@@ -3,6 +3,10 @@
 
 # Changelog
 
+## Unreleased
+
+Requires Elixir 1.20 or later.
+
 ## 0.2.1 — Vocabulary reconciliation
 
 Reconciled the shared snapshot vocabulary to the #147 extraction terms
