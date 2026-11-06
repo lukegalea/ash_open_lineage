@@ -200,7 +200,7 @@ defmodule AshOpenLineage.Snapshot.CanonicalJSONTest do
       }
     end
 
-    test "cross-host golden digest is stable (re-asserted by ash_planning and keystone)" do
+    test "cross-host golden digest is stable (re-asserted by a downstream host)" do
       assert Snapshot.put_digest(golden_snapshot()).digest == @golden_digest
     end
 
