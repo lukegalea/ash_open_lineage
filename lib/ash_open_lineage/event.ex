@@ -48,10 +48,17 @@ defmodule AshOpenLineage.Event do
   # The leak boundary: a facet string must never be caller-supplied data. An
   # atom like `:"tenant-acme-corp-42"` passed as a purpose or definition kind
   # would ride Atom.to_string/1 straight onto the wire, so the builder is total
-  # over NO atoms — every purpose/kind must be on these lists. Extending a list
-  # is a deliberate first-party edit (plus a schema/leak-test touch), never a
-  # call-site option.
-  @purposes [:"extraction.quote_v1", :"planning.personal_week"]
+  # over NO atoms — every purpose/kind must be on these lists. Definition kinds
+  # extend only by first-party edit. Purposes extend via the host application
+  # env key `:extra_snapshot_purposes` — still a deliberate host act (a config
+  # commit, reviewed like code), never a call-site option, and read at call
+  # time so a host can extend without patching this module.
+  @default_purposes [:"extraction.quote_v1", :"planning.personal_week"]
+
+  defp purposes,
+    do:
+      @default_purposes ++
+        List.wrap(Application.get_env(:ash_open_lineage, :extra_snapshot_purposes, []))
 
   @definition_kinds [:dmn, :bpmn, :mzn, :validator]
 
@@ -83,8 +90,9 @@ defmodule AshOpenLineage.Event do
   this facet reduces it to a digest fingerprint. The leak test enforces the
   boundary.
 
-  Purposes and definition kinds are allow-listed (`@purposes`,
-  `@definition_kinds`), and the digest must be a lowercase 64-hex SHA-256
+  Purposes and definition kinds are allow-listed (`@default_purposes` plus the
+  host's `:extra_snapshot_purposes` app env for purposes, `@definition_kinds`
+  for kinds), and the digest must be a lowercase 64-hex SHA-256
   (`"^[0-9a-f]{64}$"`); any other atom or binary — one that could smuggle a
   data-bearing value onto the wire — raises `ArgumentError`. Validation only:
   deriving the digest stays `AshOpenLineage.Snapshot.put_digest/1`'s job.
@@ -124,12 +132,14 @@ defmodule AshOpenLineage.Event do
             "AshOpenLineage.Snapshot.put_digest/1"
   end
 
-  defp purpose_string!(purpose) when purpose in @purposes, do: Atom.to_string(purpose)
-
-  defp purpose_string!(other) do
-    raise ArgumentError,
-          "invalid snapshot purpose #{inspect(other)} — the ashOpenLineageSnapshot " <>
-            "facet only allows #{inspect(@purposes)}"
+  defp purpose_string!(purpose) do
+    if purpose in purposes() do
+      Atom.to_string(purpose)
+    else
+      raise ArgumentError,
+            "invalid snapshot purpose #{inspect(purpose)} — the ashOpenLineageSnapshot " <>
+              "facet only allows #{inspect(purposes())}"
+    end
   end
 
   defp kind_string!(kind) when kind in @definition_kinds, do: Atom.to_string(kind)

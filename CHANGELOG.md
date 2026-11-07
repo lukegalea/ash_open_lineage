@@ -3,6 +3,19 @@
 
 # Changelog
 
+## 0.2.2 — Host-extensible snapshot purposes
+
+- **Changed** `AshOpenLineage.Event.snapshot_facet/2` purpose allow-listing to
+  read at call time: the built-in defaults
+  (`:"extraction.quote_v1"`, `:"planning.personal_week"`) plus the host's
+  `config :ash_open_lineage, :extra_snapshot_purposes, [...]` — still a
+  deliberate host act (a reviewed config commit), never a call-site option,
+  and a host can now extend without patching the module. Anything in neither
+  list still raises `ArgumentError`; definition kinds remain first-party-edit
+  only. Previously the list was frozen at compile time, so a host's own
+  snapshot purpose (e.g. a planning model's) could not emit the facet without
+  a first-party edit to this library.
+
 ## Unreleased
 
 Requires Elixir 1.20 or later.
