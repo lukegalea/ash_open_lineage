@@ -165,6 +165,71 @@ defmodule AshOpenLineage.LeakTest do
       refute(Enum.any?(rescued_facets(snapshot), &(&1 =~ @tenant)))
     end
 
+    # The host extension: purposes extend via the :extra_snapshot_purposes app
+    # env, read at call time — a deliberate host act (a config commit), never a
+    # call-site option, and the allow-list boundary itself does not move.
+    test "a purpose in extra_snapshot_purposes builds a facet" do
+      Application.put_env(:ash_open_lineage, :extra_snapshot_purposes, [
+        :"planning.weekly_roster",
+        :"planning.mobile_visits"
+      ])
+
+      on_exit(fn -> Application.delete_env(:ash_open_lineage, :extra_snapshot_purposes) end)
+
+      snapshot = %Snapshot{
+        base_snapshot()
+        | purpose: :"planning.mobile_visits",
+          digest: String.duplicate("ef", 32)
+      }
+
+      facet = Event.snapshot_facet(snapshot)
+
+      assert facet["purpose"] == "planning.mobile_visits"
+
+      facet |> Jason.encode!() |> Jason.decode!() |> then(&assert_clean!(&1, forbidden()))
+      assert_clean!(facet, forbidden())
+    end
+
+    test "a purpose in neither the defaults nor the extension still raises" do
+      Application.put_env(:ash_open_lineage, :extra_snapshot_purposes, [:"planning.weekly_roster"])
+
+      on_exit(fn -> Application.delete_env(:ash_open_lineage, :extra_snapshot_purposes) end)
+
+      snapshot = %Snapshot{
+        base_snapshot()
+        | purpose: :"tenant-dashboard.special_view",
+          digest: String.duplicate("ef", 32)
+      }
+
+      assert_raise ArgumentError,
+                   ~r/only allows \[:"extraction.quote_v1", :"planning.personal_week", :"planning.weekly_roster"\]/,
+                   fn ->
+                     Event.snapshot_facet(snapshot)
+                   end
+    end
+
+    test "the extension is read at call time, not frozen at compile" do
+      snapshot = fn -> %Snapshot{base_snapshot() | purpose: :"planning.weekly_roster"} end
+
+      refute Application.get_env(:ash_open_lineage, :extra_snapshot_purposes)
+
+      assert_raise ArgumentError, ~r/invalid snapshot purpose/, fn ->
+        Event.snapshot_facet(snapshot.())
+      end
+
+      Application.put_env(:ash_open_lineage, :extra_snapshot_purposes, [:"planning.weekly_roster"])
+
+      on_exit(fn -> Application.delete_env(:ash_open_lineage, :extra_snapshot_purposes) end)
+
+      assert Event.snapshot_facet(snapshot.())["purpose"] == "planning.weekly_roster"
+
+      Application.delete_env(:ash_open_lineage, :extra_snapshot_purposes)
+
+      assert_raise ArgumentError, ~r/invalid snapshot purpose/, fn ->
+        Event.snapshot_facet(snapshot.())
+      end
+    end
+
     test "raises on a data-bearing definition kind atom and never emits it" do
       leaky_definition = %Snapshot.Definition{
         kind: :"leak-#{@tenant}",
